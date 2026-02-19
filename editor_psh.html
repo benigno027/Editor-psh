@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor de Materiales PSH</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #e05a00;
+      --accent-dark: #b84900;
+      --bg: #f8f9fa;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    .navbar-brand {
+      font-weight: 700;
+      color: var(--accent) !important;
+      font-size: 1.3rem;
+    }
+
+    .toolbar {
+      background: #fff;
+      border-bottom: 1px solid #dee2e6;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .file-name {
+      font-size: 0.85rem;
+      color: #6c757d;
+      margin-left: auto;
+      font-style: italic;
+    }
+
+    .badge-action-engrave {
+      background-color: #0d6efd;
+    }
+
+    .badge-action-cut {
+      background-color: #dc3545;
+    }
+
+    .badge-action-fill {
+      background-color: #198754;
+    }
+
+    .table-hover tbody tr {
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .table-hover tbody tr:hover {
+      background-color: #fff3eb;
+    }
+
+    .btn-accent {
+      background-color: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-accent:hover {
+      background-color: var(--accent-dark);
+      border-color: var(--accent-dark);
+      color: #fff;
+    }
+
+    .drop-zone {
+      border: 2px dashed #adb5bd;
+      border-radius: 12px;
+      padding: 3rem;
+      text-align: center;
+      color: #6c757d;
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: #fff3eb;
+      color: var(--accent);
+    }
+
+    .drop-zone i {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    #tableSection { display: none; }
+    #emptySection { display: block; }
+
+    .stat-badge {
+      background: #f1f3f5;
+      border-radius: 8px;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.82rem;
+      color: #495057;
+    }
+
+    .col-visible { width: 70px; text-align: center; }
+    .col-action { width: 100px; }
+    .col-power, .col-speed, .col-cycles { width: 80px; text-align: center; }
+    .col-ops { width: 60px; text-align: center; }
+
+    .search-box {
+      max-width: 240px;
+    }
+
+    /* Modal field helpers */
+    .field-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #6c757d;
+      margin-bottom: 4px;
+    }
+
+    /* Section headers inside modal */
+    .form-section {
+      border-left: 3px solid var(--accent);
+      padding-left: 0.65rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .form-section-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #343a40;
+      line-height: 1.2;
+    }
+
+    .form-section-desc {
+      font-size: 0.75rem;
+      color: #6c757d;
+    }
+
+    /* Unsaved indicator */
+    .unsaved-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    #saveBtn:disabled {
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-light bg-white border-bottom px-3">
+  <span class="navbar-brand"><i class="bi bi-cpu"></i> Editor PSH Materiales</span>
+</nav>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="btn btn-accent btn-sm" id="openBtn">
+    <i class="bi bi-folder2-open me-1"></i>Abrir archivo
+  </button>
+  <button class="btn btn-outline-success btn-sm" id="addBtn" disabled>
+    <i class="bi bi-plus-lg me-1"></i>Nuevo material
+  </button>
+  <button class="btn btn-outline-primary btn-sm" id="saveBtn" disabled>
+    <i class="bi bi-floppy me-1"></i>Guardar
+  </button>
+  <button class="btn btn-outline-secondary btn-sm" id="downloadBtn" disabled title="Descargar copia">
+    <i class="bi bi-download me-1"></i>Descargar
+  </button>
+
+  <div class="ms-3">
+    <input type="text" class="form-control form-control-sm search-box" id="searchInput"
+           placeholder="Buscar material, modelo..." disabled>
+  </div>
+
+  <span class="file-name" id="fileName">Sin archivo cargado</span>
+</div>
+
+<!-- Resume banner -->
+<div id="resumeBanner" class="d-flex align-items-center gap-3 px-3 py-2 border-bottom bg-light" style="display:none!important">
+  <i class="bi bi-clock-history text-primary fs-5"></i>
+  <div class="flex-grow-1 small">
+    <strong>Sesión anterior:</strong> <span id="resumeFileName" class="text-muted"></span>
+  </div>
+  <button class="btn btn-sm btn-primary" id="resumeBtn">
+    <i class="bi bi-arrow-counterclockwise me-1"></i>Recargar este archivo
+  </button>
+  <button class="btn btn-sm btn-outline-secondary" id="resumeDismissBtn">Cargar otro</button>
+</div>
+
+<!-- Stats bar -->
+<div class="container-fluid px-3 py-2" id="statsBar" style="display:none">
+  <span class="stat-badge me-2" id="statTotal">0 registros</span>
+  <span class="stat-badge me-2" id="statVisible">0 visibles</span>
+  <span class="stat-badge me-2" id="statEngrave">0 Engrave</span>
+  <span class="stat-badge" id="statCut">0 Cut</span>
+</div>
+
+<!-- Empty / Drop Zone -->
+<div class="container py-5" id="emptySection">
+  <div class="drop-zone mx-auto" style="max-width:480px" id="dropZone">
+    <i class="bi bi-file-earmark-code"></i>
+    <h5>Arrastra aquí tu archivo .psh</h5>
+    <p class="mb-3">o haz clic en <strong>Abrir archivo</strong> en la barra de herramientas</p>
+    <small class="text-muted">Formato XML compatible con LaserTree / xTool</small>
+  </div>
+</div>
+
+<!-- Table Section -->
+<div class="container-fluid px-3 pb-4" id="tableSection">
+  <div class="table-responsive mt-2">
+    <table class="table table-hover table-bordered table-sm align-middle" id="materialsTable">
+      <thead class="table-dark sticky-top">
+        <tr>
+          <th class="col-visible">Visible</th>
+          <th>Modelo</th>
+          <th>Material</th>
+          <th>Grosor</th>
+          <th class="col-action">Acción</th>
+          <th class="col-power">Potencia</th>
+          <th class="col-speed">Velocidad</th>
+          <th class="col-cycles">Ciclos</th>
+          <th class="col-cycles">Focus</th>
+          <th class="col-cycles">Interval</th>
+          <th class="col-cycles">Quality</th>
+          <th>Comentarios</th>
+          <th class="col-ops"></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <!-- Pagination bar -->
+  <div id="paginationBar" class="d-flex align-items-center gap-3 mt-1 pt-1" style="display:none">
+    <nav aria-label="Paginación">
+      <ul class="pagination pagination-sm mb-0" id="paginationList"></ul>
+    </nav>
+    <span class="text-muted small" id="paginationInfo"></span>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <label class="small text-muted mb-0" for="pageSizeSelect">Por página:</label>
+      <select class="form-select form-select-sm" id="pageSizeSelect" style="width:auto">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Editar material</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editId">
+        <input type="hidden" id="editIndex">
+
+        <!-- ── Sección 1: Identificación ──────────────────────────────── -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="bi bi-tag me-1"></i>Identificación del material</div>
+          <div class="form-section-desc">Define qué material es, en qué máquina se usa y si aparecerá visible en la lista de la máquina láser.</div>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="editVisible" role="switch">
+              <label class="form-check-label small" for="editVisible">
+                <strong>Visible en la lista de la máquina</strong>
+                <span class="text-muted"> — desactivar para ocultar sin eliminar</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="col-md-5">
+            <div class="field-label">Modelo de láser</div>
+            <input type="text" class="form-control" id="editModel" placeholder="Ej. xTool S1, LaserTree K40">
+          </div>
+
+          <div class="col-md-5">
+            <div class="field-label">Material <span class="text-danger">*</span></div>
+            <input type="text" class="form-control" id="editMaterial" placeholder="Ej. MDF, Acrílico, Cuero, Aluminio">
+          </div>
+
+          <div class="col-md-2">
+            <div class="field-label">Grosor</div>
+            <input type="text" class="form-control" id="editThickness" placeholder="Ej. 3mm">
+          </div>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- ── Sección 2: Parámetros del proceso ─────────────────────── -->
+        <div class="form-section mt-3">
+          <div class="form-section-title"><i class="bi bi-lightning-charge me-1"></i>Parámetros del proceso láser</div>
+          <div class="form-section-desc">Valores que controlan el tipo de operación, la intensidad del haz, la velocidad de desplazamiento y la cantidad de pasadas.</div>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="field-label">Operación</div>
+            <select class="form-select" id="editAction">
+              <option value="Engrave">Engrave — Grabado</option>
+              <option value="Cut">Cut — Corte</option>
+              <option value="Fill">Fill — Relleno</option>
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <div class="field-label">Potencia (%)</div>
+            <input type="number" class="form-control" id="editPower" min="0" max="100">
+            <div class="form-text">Intensidad del haz láser</div>
+          </div>
+
+          <div class="col-md-2">
+            <div class="field-label">Velocidad</div>
+            <input type="number" class="form-control" id="editSpeed" min="0">
+            <div class="form-text">mm/min</div>
+          </div>
+
+          <div class="col-md-2">
+            <div class="field-label">Ciclos</div>
+            <input type="number" class="form-control" id="editCycles" min="1">
+            <div class="form-text">Pasadas del láser</div>
+          </div>
+
+          <div class="col-md-2">
+            <div class="field-label">Focus</div>
+            <input type="number" class="form-control" id="editFocus" min="0" step="1">
+            <div class="form-text">Ajuste de enfoque</div>
+          </div>
+
+          <div class="col-md-2">
+            <div class="field-label">Interval (mm)</div>
+            <input type="number" class="form-control" id="editInterval" min="0" step="0.01">
+            <div class="form-text">Separación entre líneas</div>
+          </div>
+
+          <div class="col-md-2">
+            <div class="field-label">Quality (l/mm)</div>
+            <input type="number" class="form-control" id="editQuality" min="0" step="0.1">
+            <div class="form-text">Líneas por milímetro</div>
+          </div>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- ── Sección 3: Notas ───────────────────────────────────────── -->
+        <div class="form-section mt-3">
+          <div class="form-section-title"><i class="bi bi-chat-left-text me-1"></i>Notas adicionales</div>
+          <div class="form-section-desc">Observaciones libres: condiciones de prueba, advertencias, resultados obtenidos, etc.</div>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <textarea class="form-control" id="editRemarks" rows="3"
+              placeholder="Ej. Probado con lente de 2&quot;, requiere ventilación activa, resultado óptimo a 25°C..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-accent" id="saveEditBtn">
+          <i class="bi bi-check2 me-1"></i>Aplicar cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white py-2">
+        <h6 class="modal-title mb-0"><i class="bi bi-trash me-1"></i>Eliminar registro</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-1">¿Eliminar el material <strong id="deleteName"></strong>?</p>
+        <small class="text-muted">Esta acción no se puede deshacer (hasta guardar).</small>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-danger" id="confirmDeleteBtn">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="toast" class="toast align-items-center text-white border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // ─── IndexedDB helpers (FileSystemFileHandle no cabe en localStorage) ────────
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('psh-editor-db', 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('data')) db.createObjectStore('data');
+      };
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function storeFileHandle(handle) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('data', 'readwrite');
+      tx.objectStore('data').put(handle, 'fileHandle');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function getStoredFileHandle() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('data', 'readonly');
+      const req = tx.objectStore('data').get('fileHandle');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function clearStoredHandle() {
+    localStorage.removeItem('psh-last-filename');
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('data', 'readwrite');
+      tx.objectStore('data').delete('fileHandle');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ─── Auto-save ────────────────────────────────────────────────────────────────
+  async function autoSave() {
+    if (fileHandle) {
+      await saveFile(true);
+    } else {
+      markUnsaved(true);
+    }
+  }
+
+  // ─── Check for previous session ──────────────────────────────────────────────
+  async function checkLastFile() {
+    const lastName = localStorage.getItem('psh-last-filename');
+    if (!lastName) return;
+    try {
+      const handle = await getStoredFileHandle();
+      if (!handle) { localStorage.removeItem('psh-last-filename'); return; }
+      document.getElementById('resumeFileName').textContent = lastName;
+      const banner = document.getElementById('resumeBanner');
+      banner.style.display = 'flex';
+    } catch (e) {
+      localStorage.removeItem('psh-last-filename');
+    }
+  }
+
+  // ─── State ───────────────────────────────────────────────────────────────────
+  let materials = [];
+  let fileHandle = null;
+  let xmlNamespace = 'http://tempuri.org/MaterialDB.xsd';
+  let unsaved = false;
+  let deleteIndex = null;
+  let currentPage = 1;
+  let pageSize = 50;
+
+  // Bootstrap instances
+  const editModalEl = document.getElementById('editModal');
+  const editModal = new bootstrap.Modal(editModalEl);
+  const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+  const toastEl = document.getElementById('toast');
+  const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+
+  // ─── Utilities ────────────────────────────────────────────────────────────────
+  function uuid() {
+    return crypto.randomUUID();
+  }
+
+  function notify(msg, type = 'success') {
+    const colors = { success: 'bg-success', danger: 'bg-danger', warning: 'bg-warning text-dark', info: 'bg-primary' };
+    toastEl.className = `toast align-items-center text-white border-0 ${colors[type] || 'bg-secondary'}`;
+    if (type === 'warning') toastEl.classList.remove('text-white');
+    document.getElementById('toastMsg').textContent = msg;
+    toast.show();
+  }
+
+  function markUnsaved(flag = true) {
+    unsaved = flag;
+    document.getElementById('saveBtn').disabled = !(flag && fileHandle);
+    const name = document.getElementById('fileName');
+    const base = fileHandle ? fileHandle.name : 'Sin archivo';
+    name.innerHTML = flag && fileHandle
+      ? `<span class="unsaved-dot"></span>${base} (sin guardar)`
+      : base;
+  }
+
+  // ─── XML Parse ────────────────────────────────────────────────────────────────
+  function parseXML(text) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'application/xml');
+    const err = doc.querySelector('parsererror');
+    if (err) throw new Error('XML inválido: ' + err.textContent);
+
+    // Detect namespace from root
+    const root = doc.documentElement;
+    if (root.getAttribute('xmlns')) xmlNamespace = root.getAttribute('xmlns');
+
+    const nodes = doc.querySelectorAll('Materials');
+    return Array.from(nodes).map(n => ({
+      id:        getText(n, 'id') || uuid(),
+      Visible:   getText(n, 'Visible') === 'true',
+      Model:     getText(n, 'Model'),
+      Material:  getText(n, 'Material'),
+      Thickness: getText(n, 'Thickness'),
+      Action:    getText(n, 'Action'),
+      Power:     getText(n, 'Power'),
+      Speed:     getText(n, 'Speed'),
+      Cycles:    getText(n, 'Cycles'),
+      Focus:     getText(n, 'Focus'),
+      Interval:  getText(n, 'Interval'),
+      Quality:   getText(n, 'Quality'),
+      Remarks:   getText(n, 'Remarks'),
+    }));
+  }
+
+  function getText(node, tag) {
+    const el = node.querySelector(tag);
+    return el ? el.textContent : '';
+  }
+
+  // ─── XML Serialize ────────────────────────────────────────────────────────────
+  function serializeXML() {
+    const rows = materials.map(m => `  <Materials>
+    <id>${escapeXml(m.id)}</id>
+    <Visible>${m.Visible}</Visible>
+    <Model>${escapeXml(m.Model)}</Model>
+    <Material>${escapeXml(m.Material)}</Material>
+    <Thickness>${escapeXml(m.Thickness)}</Thickness>
+    <Action>${escapeXml(m.Action)}</Action>
+    <Power>${escapeXml(m.Power)}</Power>
+    <Speed>${escapeXml(m.Speed)}</Speed>
+    <Cycles>${escapeXml(m.Cycles)}</Cycles>
+    <Focus>${escapeXml(m.Focus)}</Focus>
+    <Interval>${escapeXml(m.Interval)}</Interval>
+    <Quality>${escapeXml(m.Quality)}</Quality>
+    <Remarks>${escapeXml(m.Remarks)}</Remarks>
+  </Materials>`).join('\n');
+
+    return `<?xml version="1.0" standalone="yes"?>\n<MaterialDB xmlns="${xmlNamespace}">\n${rows}\n</MaterialDB>`;
+  }
+
+  function escapeXml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ─── Render Table ─────────────────────────────────────────────────────────────
+  function getFilteredMaterials() {
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (!q) return materials.map((m, i) => ({ m, i }));
+    return materials.map((m, i) => ({ m, i })).filter(({ m }) =>
+      [m.Material, m.Model, m.Action, m.Thickness, m.Remarks].some(v => v.toLowerCase().includes(q))
+    );
+  }
+
+  function actionBadge(action) {
+    const cls = {
+      Engrave: 'badge-action-engrave',
+      Cut: 'badge-action-cut',
+      Fill: 'badge-action-fill',
+    }[action] || 'bg-secondary';
+    return `<span class="badge ${cls}">${action || '-'}</span>`;
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    const filtered = getFilteredMaterials();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageItems = filtered.slice(start, start + pageSize);
+
+    tbody.innerHTML = pageItems.map(({ m, i }) => `
+      <tr data-index="${i}" class="${!m.Visible ? 'text-muted' : ''}">
+        <td class="col-visible text-center">
+          ${m.Visible
+            ? '<i class="bi bi-eye-fill text-success"></i>'
+            : '<i class="bi bi-eye-slash text-secondary"></i>'}
+        </td>
+        <td>${escapeHtml(m.Model)}</td>
+        <td><strong>${escapeHtml(m.Material)}</strong></td>
+        <td>${escapeHtml(m.Thickness)}</td>
+        <td class="col-action">${actionBadge(m.Action)}</td>
+        <td class="col-power text-center">${m.Power}%</td>
+        <td class="col-speed text-center">${m.Speed}</td>
+        <td class="col-cycles text-center">${m.Cycles}</td>
+        <td class="col-cycles text-center">${m.Focus ?? '0'}</td>
+        <td class="col-cycles text-center">${m.Interval ?? '0'}</td>
+        <td class="col-cycles text-center">${m.Quality ?? '0'}</td>
+        <td class="small text-muted" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+            title="${escapeHtml(m.Remarks)}">${escapeHtml(m.Remarks)}</td>
+        <td class="col-ops">
+          <button class="btn btn-sm btn-outline-danger py-0 px-1 btn-delete" data-index="${i}" title="Eliminar">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </td>
+      </tr>`).join('');
+
+    updateStats();
+    renderPagination(filtered.length, totalPages);
+  }
+
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function updateStats() {
+    const total = materials.length;
+    const visible = materials.filter(m => m.Visible).length;
+    const engrave = materials.filter(m => m.Action === 'Engrave').length;
+    const cut = materials.filter(m => m.Action === 'Cut').length;
+    document.getElementById('statTotal').textContent = `${total} registros`;
+    document.getElementById('statVisible').textContent = `${visible} visibles`;
+    document.getElementById('statEngrave').textContent = `${engrave} Engrave`;
+    document.getElementById('statCut').textContent = `${cut} Cut`;
+  }
+
+  // ─── Pagination ───────────────────────────────────────────────────────────────
+  function buildPageRange(current, total) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 4) return [1, 2, 3, 4, 5, null, total];
+    if (current >= total - 3) return [1, null, total - 4, total - 3, total - 2, total - 1, total];
+    return [1, null, current - 1, current, current + 1, null, total];
+  }
+
+  function renderPagination(totalFiltered, totalPages) {
+    const bar = document.getElementById('paginationBar');
+    if (totalPages <= 1) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, totalFiltered);
+    document.getElementById('paginationInfo').textContent = `${start}–${end} de ${totalFiltered}`;
+
+    const pages = buildPageRange(currentPage, totalPages);
+    document.getElementById('paginationList').innerHTML = [
+      `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+         <a class="page-link" href="#" data-page="${currentPage - 1}">&#8249;</a>
+       </li>`,
+      ...pages.map(p => p === null
+        ? `<li class="page-item disabled"><span class="page-link">…</span></li>`
+        : `<li class="page-item ${p === currentPage ? 'active' : ''}">
+             <a class="page-link" href="#" data-page="${p}">${p}</a>
+           </li>`
+      ),
+      `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+         <a class="page-link" href="#" data-page="${currentPage + 1}">&#8250;</a>
+       </li>`,
+    ].join('');
+  }
+
+  // ─── Load File ────────────────────────────────────────────────────────────────
+  async function openFile(file, handle = null) {
+    try {
+      const text = await file.text();
+      materials = parseXML(text);
+      fileHandle = handle;
+      markUnsaved(false);
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('resumeBanner').style.display = 'none';
+      document.getElementById('emptySection').style.display = 'none';
+      document.getElementById('tableSection').style.display = 'block';
+      document.getElementById('statsBar').style.display = 'block';
+      document.getElementById('addBtn').disabled = false;
+      document.getElementById('downloadBtn').disabled = false;
+      document.getElementById('searchInput').disabled = false;
+      currentPage = 1;
+      if (!handle) {
+        document.getElementById('saveBtn').disabled = true;
+        notify('Archivo cargado (sin acceso de escritura, usa Descargar para guardar)', 'warning');
+      } else {
+        await storeFileHandle(handle);
+        localStorage.setItem('psh-last-filename', file.name);
+        notify(`Cargados ${materials.length} materiales`, 'success');
+      }
+      renderTable();
+    } catch (e) {
+      notify('Error al leer el archivo: ' + e.message, 'danger');
+    }
+  }
+
+  // ─── Save File ────────────────────────────────────────────────────────────────
+  async function saveFile(auto = false) {
+    if (!fileHandle) return;
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(serializeXML());
+      await writable.close();
+      markUnsaved(false);
+      notify(auto ? 'Guardado automáticamente' : 'Archivo guardado correctamente', 'success');
+    } catch (e) {
+      notify('Error al guardar: ' + e.message, 'danger');
+    }
+  }
+
+  function downloadFile() {
+    const xml = serializeXML();
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileHandle ? fileHandle.name : 'materiales.psh';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    notify('Descarga iniciada', 'info');
+  }
+
+  // ─── Edit Modal ───────────────────────────────────────────────────────────────
+  function openEditModal(index) {
+    const m = index === -1
+      ? { id: uuid(), Visible: true, Model: '', Material: '', Thickness: '-', Action: 'Engrave', Power: '100', Speed: '1000', Cycles: '1', Focus: '0', Interval: '0', Quality: '0', Remarks: '' }
+      : materials[index];
+
+    document.getElementById('modalTitle').textContent = index === -1 ? 'Nuevo material' : 'Editar material';
+    document.getElementById('editIndex').value = index;
+    document.getElementById('editId').value = m.id;
+    document.getElementById('editVisible').checked = m.Visible;
+    document.getElementById('editModel').value = m.Model;
+    document.getElementById('editMaterial').value = m.Material;
+    document.getElementById('editThickness').value = m.Thickness;
+    document.getElementById('editAction').value = m.Action;
+    document.getElementById('editPower').value = m.Power;
+    document.getElementById('editSpeed').value = m.Speed;
+    document.getElementById('editCycles').value = m.Cycles;
+    document.getElementById('editFocus').value = m.Focus ?? '0';
+    document.getElementById('editInterval').value = m.Interval ?? '0';
+    document.getElementById('editQuality').value = m.Quality ?? '0';
+    document.getElementById('editRemarks').value = m.Remarks;
+    editModal.show();
+  }
+
+  document.getElementById('saveEditBtn').addEventListener('click', async () => {
+    const index = parseInt(document.getElementById('editIndex').value);
+    const record = {
+      id:        document.getElementById('editId').value || uuid(),
+      Visible:   document.getElementById('editVisible').checked,
+      Model:     document.getElementById('editModel').value.trim(),
+      Material:  document.getElementById('editMaterial').value.trim(),
+      Thickness: document.getElementById('editThickness').value.trim() || '-',
+      Action:    document.getElementById('editAction').value,
+      Power:     document.getElementById('editPower').value,
+      Speed:     document.getElementById('editSpeed').value,
+      Cycles:    document.getElementById('editCycles').value,
+      Focus:     document.getElementById('editFocus').value,
+      Interval:  document.getElementById('editInterval').value,
+      Quality:   document.getElementById('editQuality').value,
+      Remarks:   document.getElementById('editRemarks').value.trim(),
+    };
+
+    if (!record.Material) {
+      document.getElementById('editMaterial').classList.add('is-invalid');
+      return;
+    }
+    document.getElementById('editMaterial').classList.remove('is-invalid');
+
+    if (index === -1) {
+      materials.push(record);
+    } else {
+      materials[index] = record;
+    }
+
+    editModal.hide();
+    renderTable();
+    notify(index === -1 ? 'Material añadido' : 'Material actualizado', 'success');
+    await autoSave();
+  });
+
+  // ─── Delete ───────────────────────────────────────────────────────────────────
+  document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+    if (deleteIndex === null) return;
+    materials.splice(deleteIndex, 1);
+    deleteIndex = null;
+    deleteModal.hide();
+    renderTable();
+    notify('Material eliminado', 'warning');
+    await autoSave();
+  });
+
+  // ─── Table Events (delegation) ────────────────────────────────────────────────
+  document.getElementById('tableBody').addEventListener('click', e => {
+    const btnDel = e.target.closest('.btn-delete');
+    if (btnDel) {
+      e.stopPropagation();
+      deleteIndex = parseInt(btnDel.dataset.index);
+      document.getElementById('deleteName').textContent = materials[deleteIndex].Material;
+      deleteModal.show();
+      return;
+    }
+    const row = e.target.closest('tr[data-index]');
+    if (row) openEditModal(parseInt(row.dataset.index));
+  });
+
+  // ─── Toolbar Buttons ──────────────────────────────────────────────────────────
+  document.getElementById('openBtn').addEventListener('click', async () => {
+    if ('showOpenFilePicker' in window) {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'Archivos PSH', accept: { 'application/xml': ['.psh', '.xml'] } }],
+          multiple: false,
+        });
+        const file = await handle.getFile();
+        await openFile(file, handle);
+      } catch (e) {
+        if (e.name !== 'AbortError') notify('Error al abrir: ' + e.message, 'danger');
+      }
+    } else {
+      // Fallback para navegadores sin File System Access API
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.psh,.xml';
+      input.onchange = async () => {
+        if (input.files[0]) await openFile(input.files[0], null);
+      };
+      input.click();
+    }
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', saveFile);
+  document.getElementById('downloadBtn').addEventListener('click', downloadFile);
+  document.getElementById('addBtn').addEventListener('click', () => openEditModal(-1));
+  document.getElementById('searchInput').addEventListener('input', () => { currentPage = 1; renderTable(); });
+
+  // Pagination click delegation
+  document.getElementById('paginationList').addEventListener('click', e => {
+    e.preventDefault();
+    const a = e.target.closest('a[data-page]');
+    if (!a) return;
+    const page = parseInt(a.dataset.page);
+    const filtered = getFilteredMaterials();
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (page >= 1 && page <= totalPages) { currentPage = page; renderTable(); }
+  });
+
+  document.getElementById('pageSizeSelect').addEventListener('change', e => {
+    pageSize = parseInt(e.target.value);
+    currentPage = 1;
+    renderTable();
+  });
+
+  // ─── Drag & Drop ──────────────────────────────────────────────────────────────
+  const dropZone = document.getElementById('dropZone');
+
+  dropZone.addEventListener('click', () => document.getElementById('openBtn').click());
+
+  ['dragenter', 'dragover'].forEach(evt =>
+    dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+
+  ['dragleave', 'drop'].forEach(evt =>
+    dropZone.addEventListener(evt, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+
+  dropZone.addEventListener('drop', async e => {
+    const file = e.dataTransfer.files[0];
+    if (file) await openFile(file, null);
+  });
+
+  // También drag sobre toda la página
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', async e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.psh') || file.name.endsWith('.xml'))) {
+      await openFile(file, null);
+    }
+  });
+
+  // ─── Keyboard shortcut Ctrl+S ─────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (!document.getElementById('saveBtn').disabled) saveFile();
+      else if (!document.getElementById('downloadBtn').disabled) downloadFile();
+    }
+  });
+
+  // ─── Resume banner listeners ──────────────────────────────────────────────────
+  document.getElementById('resumeBtn').addEventListener('click', async () => {
+    document.getElementById('resumeBanner').style.display = 'none';
+    try {
+      const handle = await getStoredFileHandle();
+      if (!handle) { notify('No se pudo recuperar el archivo guardado', 'danger'); return; }
+      const perm = await handle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') { notify('Permiso denegado para acceder al archivo', 'warning'); return; }
+      const file = await handle.getFile();
+      await openFile(file, handle);
+    } catch (e) {
+      notify('Error al recargar el archivo: ' + e.message, 'danger');
+    }
+  });
+
+  document.getElementById('resumeDismissBtn').addEventListener('click', async () => {
+    await clearStoredHandle();
+    location.reload();
+  });
+
+  // ─── Init ─────────────────────────────────────────────────────────────────────
+  checkLastFile();
+</script>
+</body>
+</html>
